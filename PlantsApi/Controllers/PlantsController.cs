@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Azure.Data.Tables;
 
 namespace PlantsApi.Controllers
 {
@@ -23,9 +24,17 @@ namespace PlantsApi.Controllers
         }
 
         [HttpGet]//.../Plants
-        public IEnumerable<string> Get()
+        public IList<string> Get()
         {
-            return Plants;
+
+            var connectionString =
+                "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
+            var tableClient = new TableClient(connectionString, "Plants");
+            var entities = tableClient.Query<TableEntity>();
+
+            var plantNames = entities.Select(x => x["Name"].ToString()).ToList();
+
+            return plantNames;
         }
     }
 }
