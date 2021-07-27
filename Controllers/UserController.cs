@@ -10,15 +10,15 @@ namespace PlantsApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class UsersController : ControllerBase
+    public class UserController : ControllerBase
     {
         private static readonly string[] Users = new[]
         {
             "User1", "User2", "User3"
         };
-        private readonly ILogger<UsersController> _logger;
+        private readonly ILogger<UserController> _logger;
 
-        public UsersController(ILogger<UsersController> logger)
+        public UserController(ILogger<UserController> logger)
         {
             _logger = logger;
         }
