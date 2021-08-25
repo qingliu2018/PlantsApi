@@ -1,9 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
+using Azure;
 using Azure.Data.Tables;
 
 namespace PlantsApi.Controllers
@@ -12,11 +11,8 @@ namespace PlantsApi.Controllers
     [Route("[controller]")]
     public class UsersController : ControllerBase
     {
-        private static readonly string[] Users = new[]
-        {
-            "User1", "User2", "User3"
-        };
         private readonly ILogger<UsersController> _logger;
+        private const string ConnectionString = "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
 
         public UsersController(ILogger<UsersController> logger)
         {
@@ -24,17 +20,45 @@ namespace PlantsApi.Controllers
         }
 
         [HttpGet]//.../Users
-        public IList<string> Get()
+        public Pageable<TableEntity> Get()
         {
-
-            var connectionString =
-                "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
-            var tableClient = new TableClient(connectionString, "Users");
+            var tableClient = new TableClient(ConnectionString, "Users");
             var entities = tableClient.Query<TableEntity>();
+            return entities;
+        }
 
-            var UserNames = entities.Select(x => x["UserName"].ToString()).ToList();
+        [HttpGet]//.../Users
+        [Route("{id}")]
+        public TableEntity Get(int id)
+        {
+            var tableClient = new TableClient(ConnectionString, "Users");
+            var filters = new List<string>();
+            filters.Add($"RowKey eq '{id}'");
+            var filter = string.Join(" and ", filters);
+            var entities = tableClient.Query<TableEntity>(filter);
+            return entities.FirstOrDefault();
+        }
 
-            return UserNames;
+        [HttpGet]//.../Users
+        [Route("{id}/Plants")]
+        public Pageable<TableEntity> Plants(int id)
+        {
+            //step 1: get user plants associations
+            var userPlantsTableClient = new TableClient(ConnectionString, "UserPlants");
+            var getUserPlantsFilter = string.Join(" and ", new List<string> { $"UserRowKey eq '{id}'" });
+            var userPlants = userPlantsTableClient.Query<TableEntity>(getUserPlantsFilter);
+            var plantsOwnedIds = userPlants.Select(x => x["PlantRowKey"].ToString()).ToList();
+
+            //step 2: get actual plant info
+            if (plantsOwnedIds.Count > 0)
+            {
+                var plantsTableClient = new TableClient(ConnectionString, "Plants");
+                var getPlantsFilter = string.Join(" or ", plantsOwnedIds.Select(p => $"RowKey eq '{p}'"));
+                var plants = plantsTableClient.Query<TableEntity>(getPlantsFilter);
+                return plants;
+
+            }
+            return null;
         }
     }
 }

@@ -1,9 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+using Azure;
 using Azure.Data.Tables;
 
 namespace PlantsApi.Controllers
@@ -12,11 +9,8 @@ namespace PlantsApi.Controllers
     [Route("[controller]")]
     public class PlantsController : ControllerBase
     {
-        private static readonly string[] Plants = new[]
-        {
-            "Monstera", "Banana", "Tits"
-        };
         private readonly ILogger<PlantsController> _logger;
+        private const string ConnectionString = "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
 
         public PlantsController(ILogger<PlantsController> logger)
         {
@@ -24,17 +18,13 @@ namespace PlantsApi.Controllers
         }
 
         [HttpGet]//.../Plants
-        public IList<string> Get()
+        public Pageable<TableEntity> Get()
         {
 
-            var connectionString =
-                "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
-            var tableClient = new TableClient(connectionString, "Plants");
+            var tableClient = new TableClient(ConnectionString, "Plants");
             var entities = tableClient.Query<TableEntity>();
-
-            var plantNames = entities.Select(x => x["Name"].ToString()).ToList();
-
-            return plantNames;
+            // var plantNames = entities.Select(x => x["Name"].ToString()).ToList();
+            return entities;
         }
     }
 }
