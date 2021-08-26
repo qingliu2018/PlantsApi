@@ -20,7 +20,6 @@ namespace PlantsApi.Controllers
         [HttpGet]//.../Plants
         public Pageable<TableEntity> Get()
         {
-
             var tableClient = new TableClient(ConnectionString, "Plants");
             var entities = tableClient.Query<TableEntity>();
             // var plantNames = entities.Select(x => x["Name"].ToString()).ToList();

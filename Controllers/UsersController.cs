@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Azure;
 using Azure.Data.Tables;
+using PlantsApi.Model;
 
 namespace PlantsApi.Controllers
 {
@@ -39,26 +40,54 @@ namespace PlantsApi.Controllers
             return entities.FirstOrDefault();
         }
 
-        [HttpGet]//.../Users
+        [HttpGet]
         [Route("{id}/Plants")]
-        public Pageable<TableEntity> Plants(int id)
+        public List<UserPlantDetails> Plants(int id)
         {
             //step 1: get user plants associations
             var userPlantsTableClient = new TableClient(ConnectionString, "UserPlants");
             var getUserPlantsFilter = string.Join(" and ", new List<string> { $"UserRowKey eq '{id}'" });
             var userPlants = userPlantsTableClient.Query<TableEntity>(getUserPlantsFilter);
-            var plantsOwnedIds = userPlants.Select(x => x["PlantRowKey"].ToString()).ToList();
+            var plantsOwnedIds = userPlants.Select(x => new UserPlant{
+                 RowKey = x["RowKey"].ToString(),
+                 PlantRowKey = x["PlantRowKey"].ToString(),
+                 UserRowKey = x["UserRowKey"].ToString()
+             }).ToList();
 
-            //step 2: get actual plant info
-            if (plantsOwnedIds.Count > 0)
+            //step 2: hydrate with plant info
+            if (plantsOwnedIds.Count <= 0) return null;
+
+            var userPlantsDetails = new List<UserPlantDetails>();
+            foreach (var poi in plantsOwnedIds)
             {
-                var plantsTableClient = new TableClient(ConnectionString, "Plants");
-                var getPlantsFilter = string.Join(" or ", plantsOwnedIds.Select(p => $"RowKey eq '{p}'"));
-                var plants = plantsTableClient.Query<TableEntity>(getPlantsFilter);
-                return plants;
+                var userPlantDetails = new UserPlantDetails
+                {
+                    
+                    PlantRowKey = poi.PlantRowKey,
+                    UserPlantRowKey = poi.RowKey,
+                    LastWatered = poi.LastWatered
+                };
 
+                var plantDetails = GetPlantDetailsByPlantRowKey(poi);
+                if (plantDetails != null)
+                {
+                    userPlantDetails.PlantName = plantDetails["Name"].ToString();
+                    // userPlantDetails.WateringPeriodInDays = plantDetails["WateringPeriodInDays"].ToString();
+                    // userPlantDetails.PlantPhotoUri = plantDetails["PlantPhotoUri"].ToString();
+                    // userPlantDetails.PlantWikipediaUri = plantDetails["PlantWikipediaUri"].ToString();
+                }
+
+                userPlantsDetails.Add(userPlantDetails);
             }
-            return null;
+            return userPlantsDetails;
+        }
+
+        private static TableEntity GetPlantDetailsByPlantRowKey(UserPlant poi)
+        {
+            var plantsTableClient = new TableClient(ConnectionString, "Plants");
+            var getPlantsFilter = string.Join(" and ", $"RowKey eq '{poi.PlantRowKey}'");
+            var plant = plantsTableClient.Query<TableEntity>(getPlantsFilter).FirstOrDefault();
+            return plant;
         }
     }
 }
