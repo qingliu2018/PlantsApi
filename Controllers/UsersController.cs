@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,51 +31,57 @@ namespace PlantsApi.Controllers
 
         [HttpGet]//.../Users
         [Route("{id}")]
-        public TableEntity Get(int id)
+        public TableEntity Get(string id)
         {
             var tableClient = new TableClient(ConnectionString, "Users");
-            var filters = new List<string>();
-            filters.Add($"RowKey eq '{id}'");
+            var filters = new List<string> {$"RowKey eq '{id}'"};
             var filter = string.Join(" and ", filters);
+
             var entities = tableClient.Query<TableEntity>(filter);
             return entities.FirstOrDefault();
         }
 
         [HttpGet]
         [Route("{id}/Plants")]
-        public List<UserPlantDetails> Plants(int id)
+        public List<UserPlantDomainModel> Plants(string id)
         {
             //step 1: get user plants associations
             var userPlantsTableClient = new TableClient(ConnectionString, "UserPlants");
             var getUserPlantsFilter = string.Join(" and ", new List<string> { $"UserRowKey eq '{id}'" });
             var userPlants = userPlantsTableClient.Query<TableEntity>(getUserPlantsFilter);
-            var plantsOwnedIds = userPlants.Select(x => new UserPlant{
+            var plantsOwnedIds = userPlants
+                .Select(x => new UserPlant{
                  RowKey = x["RowKey"].ToString(),
                  PlantRowKey = x["PlantRowKey"].ToString(),
-                 UserRowKey = x["UserRowKey"].ToString()
+                 UserRowKey = x["UserRowKey"].ToString(),
+                 OwnershipDate = x.GetDateTimeOffset("OwnershipDate").Value.Date,
+                 LastRepotted = x.GetDateTimeOffset("LastRepotted").Value.Date,
+                 LastWatered = x.GetDateTimeOffset("LastWatered").Value.Date,
              }).ToList();
 
             //step 2: hydrate with plant info
             if (plantsOwnedIds.Count <= 0) return null;
 
-            var userPlantsDetails = new List<UserPlantDetails>();
+            var userPlantsDetails = new List<UserPlantDomainModel>();
             foreach (var poi in plantsOwnedIds)
             {
-                var userPlantDetails = new UserPlantDetails
+                var userPlantDetails = new UserPlantDomainModel
                 {
-                    
                     PlantRowKey = poi.PlantRowKey,
                     UserPlantRowKey = poi.RowKey,
-                    LastWatered = poi.LastWatered
+                    OwnershipDate = poi.OwnershipDate ?? DateTime.MinValue,
+                    LastWatered = poi.LastWatered ?? DateTime.MinValue,
+                    LastRepotted = poi.LastRepotted ?? DateTime.MinValue,
                 };
 
                 var plantDetails = GetPlantDetailsByPlantRowKey(poi);
                 if (plantDetails != null)
                 {
                     userPlantDetails.PlantName = plantDetails["Name"].ToString();
-                    // userPlantDetails.WateringPeriodInDays = plantDetails["WateringPeriodInDays"].ToString();
-                    // userPlantDetails.PlantPhotoUri = plantDetails["PlantPhotoUri"].ToString();
-                    // userPlantDetails.PlantWikipediaUri = plantDetails["PlantWikipediaUri"].ToString();
+                    userPlantDetails.WateringPeriodInDays = plantDetails.GetInt32("WateringPeriodInDays") ?? 15;
+                    userPlantDetails.RepottingPeriodInDays = plantDetails.GetInt32("RepottingPeriodInDays") ?? 15;
+                    userPlantDetails.PlantPhotoUri = plantDetails["PlantPhotoUri"].ToString();
+                    userPlantDetails.PlantWikipediaUri = plantDetails["PlantWikipediaUri"].ToString();
                 }
 
                 userPlantsDetails.Add(userPlantDetails);

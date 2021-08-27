@@ -28,15 +28,18 @@ namespace PlantsApi.Controllers
             return entities;
         }
 
-        [HttpPost]//.../Users
+        [HttpPost]
         public async Task Post(UserPlant input)
         {
             var tableClient = new TableClient(ConnectionString, "UserPlants");
 
-            var entity = new TableEntity(input.PartitionKey, Guid.NewGuid().ToString())
+            var entity = new TableEntity("UserPlants", Guid.NewGuid().ToString())
             {
                 { "UserRowKey", input.UserRowKey },
-                { "PlantRowKey", input.PlantRowKey }
+                { "PlantRowKey", input.PlantRowKey },
+                { "OwnershipDate", input.OwnershipDate ?? DateTime.Now},
+                { "LastRepotted", input.LastRepotted ?? DateTime.Now },
+                { "LastWatered", input.LastWatered ?? DateTime.Now },
             };
 
             await tableClient.AddEntityAsync(entity);
