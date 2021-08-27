@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
@@ -20,12 +22,45 @@ namespace PlantsApi.Controllers
             _logger = logger;
         }
 
-        [HttpGet]//.../Users
+        [HttpGet]
         public async Task<AsyncPageable<TableEntity>> Get()
         {
             var tableClient = new TableClient(ConnectionString, "UserPlants");
             var entities = tableClient.QueryAsync<TableEntity>();
             return entities;
+        }
+
+        [HttpGet]
+        [Route("{id}")]
+        public async Task<AsyncPageable<TableEntity>> Get(string id)
+        {
+            var tableClient = new TableClient(ConnectionString, "UserPlants");
+            var filters = new List<string> { $"RowKey eq '{id}'" };
+            var filter = string.Join(" and ", filters);
+            var entities = tableClient.QueryAsync<TableEntity>(filter);
+            return entities;
+        }
+
+        [HttpPut]
+        [Route("{id}/Watered")]
+        public async Task<TableEntity> PlantWatered(string id)
+        {
+            var tableClient = new TableClient(ConnectionString, "UserPlants");
+            TableEntity entity = await tableClient.GetEntityAsync<TableEntity>("UserPlants", id);
+            entity["LastWatered"] = DateTime.Now;
+            await tableClient.UpdateEntityAsync(entity, ETag.All);
+            return entity;
+        }
+
+        [HttpPut]
+        [Route("{id}/Repotted")]
+        public async Task<TableEntity> PlantRepotted(string id)
+        {
+            var tableClient = new TableClient(ConnectionString, "UserPlants");
+            TableEntity entity = await tableClient.GetEntityAsync<TableEntity>("UserPlants", id);
+            entity["LastRepotted"] = DateTime.Now;
+            await tableClient.UpdateEntityAsync(entity, ETag.All);
+            return entity;
         }
 
         [HttpPost]

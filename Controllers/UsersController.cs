@@ -29,7 +29,7 @@ namespace PlantsApi.Controllers
             return entities;
         }
 
-        [HttpGet]//.../Users
+        [HttpGet]
         [Route("{id}")]
         public TableEntity Get(string id)
         {
