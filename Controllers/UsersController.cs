@@ -6,6 +6,7 @@ using System.Linq;
 using Azure;
 using Azure.Data.Tables;
 using PlantsApi.Model;
+using PlantsApi.ViewModel;
 
 namespace PlantsApi.Controllers
 {
@@ -21,7 +22,7 @@ namespace PlantsApi.Controllers
             _logger = logger;
         }
 
-        [HttpGet]//.../Users
+        [HttpGet]
         public Pageable<TableEntity> Get()
         {
             var tableClient = new TableClient(ConnectionString, "Users");
@@ -51,12 +52,12 @@ namespace PlantsApi.Controllers
             var userPlants = userPlantsTableClient.Query<TableEntity>(getUserPlantsFilter);
             var plantsOwnedIds = userPlants
                 .Select(x => new UserPlant{
-                 RowKey = x["RowKey"].ToString(),
-                 PlantRowKey = x["PlantRowKey"].ToString(),
-                 UserRowKey = x["UserRowKey"].ToString(),
-                 OwnershipDate = x.GetDateTimeOffset("OwnershipDate").Value.Date,
-                 LastRepotted = x.GetDateTimeOffset("LastRepotted").Value.Date,
-                 LastWatered = x.GetDateTimeOffset("LastWatered").Value.Date,
+                 RowKey = x.GetString("RowKey"),
+                 PlantRowKey = x.GetString("PlantRowKey"),
+                 UserRowKey = x.GetString("UserRowKey"),
+                 OwnershipDate = x.GetDateTimeOffset("OwnershipDate").GetValueOrDefault().Date,
+                 LastRepotted = x.GetDateTimeOffset("LastRepotted").GetValueOrDefault().Date,
+                 LastWatered = x.GetDateTimeOffset("LastWatered").GetValueOrDefault().Date,
              }).ToList();
 
             //step 2: hydrate with plant info
@@ -67,26 +68,52 @@ namespace PlantsApi.Controllers
             {
                 var userPlantDetails = new UserPlantDomainModel
                 {
+                    UserRowKey = poi.UserRowKey,
                     PlantRowKey = poi.PlantRowKey,
                     UserPlantRowKey = poi.RowKey,
                     OwnershipDate = poi.OwnershipDate ?? DateTime.MinValue,
                     LastWatered = poi.LastWatered ?? DateTime.MinValue,
                     LastRepotted = poi.LastRepotted ?? DateTime.MinValue,
                 };
-
                 var plantDetails = GetPlantDetailsByPlantRowKey(poi);
                 if (plantDetails != null)
                 {
-                    userPlantDetails.PlantName = plantDetails["Name"].ToString();
+                    userPlantDetails.PlantName = plantDetails.GetString("Name");
                     userPlantDetails.WateringPeriodInDays = plantDetails.GetInt32("WateringPeriodInDays") ?? 15;
                     userPlantDetails.RepottingPeriodInDays = plantDetails.GetInt32("RepottingPeriodInDays") ?? 15;
-                    userPlantDetails.PlantPhotoUri = plantDetails["PlantPhotoUri"].ToString();
-                    userPlantDetails.PlantWikipediaUri = plantDetails["PlantWikipediaUri"].ToString();
+                    userPlantDetails.PlantPhotoUri = plantDetails.GetString("PlantPhotoUri");
+                    userPlantDetails.PlantWikipediaUri = plantDetails.GetString("PlantWikipediaUri");
                 }
 
                 userPlantsDetails.Add(userPlantDetails);
             }
             return userPlantsDetails;
+        }
+
+        [HttpGet]
+        [Route("{id}/Notifications")]
+        public List<UserNotificationsDomainModel> Notifications(string id)
+        {
+            //step 1: get user notifications
+            var tableClient = new TableClient(ConnectionString, "Notifications");
+            var userNotificationsFilter = string.Join(" and ", new List<string>
+            {
+                $"UserRowKey eq '{id}'",
+                $"Read eq false" //we only get new notifications
+            });
+            var userNotifications = tableClient.Query<TableEntity>(userNotificationsFilter);
+
+            var notificationsDomainModels = userNotifications
+                .Select(x => new UserNotificationsDomainModel()
+                {
+                    RowKey = x.GetString("RowKey"),
+                    Description = x.GetString("Description"),
+                    NotificationDate = x.GetDateTimeOffset("NotificationDate").GetValueOrDefault().Date,
+                    Read = x.GetBoolean("Read").GetValueOrDefault(),
+                }).ToList();
+
+          
+            return notificationsDomainModels;
         }
 
         private static TableEntity GetPlantDetailsByPlantRowKey(UserPlant poi)

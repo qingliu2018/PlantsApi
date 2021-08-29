@@ -1,11 +1,12 @@
 ﻿using System;
 
-namespace PlantsApi.Model
+namespace PlantsApi.ViewModel
 {
     public class UserPlantDomainModel
     {
         //these come from storage
         public string UserPlantRowKey { get; set; }
+        public string UserRowKey { get; set; }
         public string PlantRowKey { get; set; }
         public string PlantName { get; set; }
         public string PlantPhotoUri { get; set; }
