@@ -1,18 +1,16 @@
-﻿using System;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using System.Collections.Generic;
 using System.Linq;
 using Azure;
 using Azure.Data.Tables;
-using PlantsApi.Model;
 using PlantsApi.ViewModel;
 
 namespace PlantsApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class UsersController : ControllerBase
+    public class UsersController : ApiControllerBase
     {
         private readonly ILogger<UsersController> _logger;
         private const string ConnectionString = "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
@@ -46,48 +44,7 @@ namespace PlantsApi.Controllers
         [Route("{id}/Plants")]
         public List<UserPlantDomainModel> Plants(string id)
         {
-            //step 1: get user plants associations
-            var userPlantsTableClient = new TableClient(ConnectionString, "UserPlants");
-            var getUserPlantsFilter = string.Join(" and ", new List<string> { $"UserRowKey eq '{id}'" });
-            var userPlants = userPlantsTableClient.Query<TableEntity>(getUserPlantsFilter);
-            var plantsOwnedIds = userPlants
-                .Select(x => new UserPlant{
-                 RowKey = x.GetString("RowKey"),
-                 PlantRowKey = x.GetString("PlantRowKey"),
-                 UserRowKey = x.GetString("UserRowKey"),
-                 OwnershipDate = x.GetDateTimeOffset("OwnershipDate").GetValueOrDefault().Date,
-                 LastRepotted = x.GetDateTimeOffset("LastRepotted").GetValueOrDefault().Date,
-                 LastWatered = x.GetDateTimeOffset("LastWatered").GetValueOrDefault().Date,
-             }).ToList();
-
-            //step 2: hydrate with plant info
-            if (plantsOwnedIds.Count <= 0) return null;
-
-            var userPlantsDetails = new List<UserPlantDomainModel>();
-            foreach (var poi in plantsOwnedIds)
-            {
-                var userPlantDetails = new UserPlantDomainModel
-                {
-                    UserRowKey = poi.UserRowKey,
-                    PlantRowKey = poi.PlantRowKey,
-                    UserPlantRowKey = poi.RowKey,
-                    OwnershipDate = poi.OwnershipDate ?? DateTime.MinValue,
-                    LastWatered = poi.LastWatered ?? DateTime.MinValue,
-                    LastRepotted = poi.LastRepotted ?? DateTime.MinValue,
-                };
-                var plantDetails = GetPlantDetailsByPlantRowKey(poi);
-                if (plantDetails != null)
-                {
-                    userPlantDetails.PlantName = plantDetails.GetString("Name");
-                    userPlantDetails.WateringPeriodInDays = plantDetails.GetInt32("WateringPeriodInDays") ?? 15;
-                    userPlantDetails.RepottingPeriodInDays = plantDetails.GetInt32("RepottingPeriodInDays") ?? 15;
-                    userPlantDetails.PlantPhotoUri = plantDetails.GetString("PlantPhotoUri");
-                    userPlantDetails.PlantWikipediaUri = plantDetails.GetString("PlantWikipediaUri");
-                }
-
-                userPlantsDetails.Add(userPlantDetails);
-            }
-            return userPlantsDetails;
+            return GetUserPlants(id);
         }
 
         [HttpGet]
@@ -116,12 +73,5 @@ namespace PlantsApi.Controllers
             return notificationsDomainModels;
         }
 
-        private static TableEntity GetPlantDetailsByPlantRowKey(UserPlant poi)
-        {
-            var plantsTableClient = new TableClient(ConnectionString, "Plants");
-            var getPlantsFilter = string.Join(" and ", $"RowKey eq '{poi.PlantRowKey}'");
-            var plant = plantsTableClient.Query<TableEntity>(getPlantsFilter).FirstOrDefault();
-            return plant;
-        }
     }
 }

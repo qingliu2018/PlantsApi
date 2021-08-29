@@ -13,10 +13,9 @@ namespace PlantsApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class UserNotificationsController : ControllerBase
+    public class UserNotificationsController : ApiControllerBase
     {
         private readonly ILogger<UserNotificationsController> _logger;
-        private const string ConnectionString = "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
 
         public UserNotificationsController(ILogger<UserNotificationsController> logger)
         {
@@ -53,47 +52,45 @@ namespace PlantsApi.Controllers
         }
 
         /// <summary>
-        /// Adds a notification reminding user about an action on a plant
-        /// If there is an existing User and Plant row key combo, the notification
-        /// will get updated with the latest data and reset to read = false
+        /// Goes through all User Plants and if any need watering or repotting it will raise a notification
         /// </summary>
-        /// <param name="input"></param>
-        /// <returns>notification details</returns>
-        [HttpPost]
-        public async Task<ActionResult> Post(UserNotificationsDomainModel input)
+        /// <returns></returns>
+        [HttpGet]
+        [Route("Generate")]
+        public async Task<ActionResult> Generate()
         {
-            var tableClient = new TableClient(ConnectionString, "Notifications");
-
-            var filters = new List<string>
+            var allUserPlants = GetUserPlants();
+            var i = 0;
+            foreach (var plant in allUserPlants.Where(plant => plant.WateringDue || plant.RepottingDue))
             {
-                $"UserRowKey eq '{input.UserRowKey}'",
-                $"PlantRowKey eq '{input.PlantRowKey}'"
-            };
-            var filter = string.Join(" and ", filters);
-
-            var entity = tableClient.Query<TableEntity>(filter).FirstOrDefault();
-
-            if (entity != null) //if notification for that user plant is there, update it
-            {
-                entity["NotificationDate"] = DateTime.Now;
-                entity["Read"] = false;
-                entity["Description"] = input.Description;
-                await tableClient.UpdateEntityAsync(entity, ETag.All);
-                return new JsonResultWithHttpStatus(entity, HttpStatusCode.OK);
-
+                i++;
+                var attention = GenerateAttentionMessage(plant);
+                
+                await RaiseNotification(new UserNotificationsDomainModel
+                {
+                    PlantRowKey = plant.PlantRowKey,
+                    UserRowKey = plant.UserRowKey,
+                    NotificationDate = DateTime.Now,
+                    Read = false,
+                    Description = $"Your {plant.PlantName} needs {attention}!"
+                });
             }
-
-            entity = new TableEntity("Notifications", Guid.NewGuid().ToString())
-            {
-                {"UserRowKey", input.UserRowKey},
-                {"UserPlantKey", input.UserRowKey},
-                {"NotificationDate", DateTime.Now},
-                {"Read", false}, //notification always starts off as unread
-                {"Description", input.Description},
-            };
-            await tableClient.AddEntityAsync(entity);
-            return new JsonResultWithHttpStatus(entity, HttpStatusCode.Created);
+            return new JsonResultWithHttpStatus($"Raised a total of {i} notifications", HttpStatusCode.OK);
         }
+
+        //
+        // /// <summary>
+        // /// Adds a notification reminding user about an action on a plant
+        // /// If there is an existing User and Plant row key combo, the notification
+        // /// will get updated with the latest data and reset to read = false
+        // /// </summary>
+        // /// <param name="input"></param>
+        // /// <returns>notification details</returns>
+        // [HttpPost]
+        // public async Task<ActionResult> Post(UserNotificationsDomainModel input)
+        // {
+        //     return await RaiseNotification(input);
+        // }
 
         /// <summary>
         /// Mark notification as read

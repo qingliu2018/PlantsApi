@@ -13,10 +13,9 @@ namespace PlantsApi.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    public class UserPlantsController : ControllerBase
+    public class UserPlantsController : ApiControllerBase
     {
         private readonly ILogger<UserPlantsController> _logger;
-        private const string ConnectionString = "DefaultEndpointsProtocol=https;AccountName=plantappstorage;AccountKey=H+ox9U/nzArLKVVnvcfIWV1K02xNnXFipfKXUfttZaoB0FB6DYRj5SKf4F8487xbUtmPpxzJIh9lMwiKw+jAfA==;EndpointSuffix=core.windows.net";
 
         public UserPlantsController(ILogger<UserPlantsController> logger)
         {
